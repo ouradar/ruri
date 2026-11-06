@@ -15,7 +15,7 @@ CPPFLAGS += -std=gnu++14
 
 LDFLAGS = -L/lib/aarch64-linux-gnu -Wl,-whole-archive -luhd -Wl,-no-whole-archive -lboost_program_options -lpthread
 
-C_PROGS = rx_samples_c tx_samples_c
+C_PROGS = rx_samples_c tx_samples_c playground_c
 CPP_PROGS = benchmark_rate
 
 all: showinfo $(C_PROGS) $(CPP_PROGS)
@@ -38,10 +38,10 @@ showinfo:
 	CPP_PROGS = \033[38;5;45m$(CPP_PROGS)\033[0m\n\
 	"
 
-$(C_PROGS): %: %.c
+$(C_PROGS): %: src/%.c
 	@echo "\033[38;5;45m$@\033[0m"
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
-$(CPP_PROGS): %: %.cpp
+$(CPP_PROGS): %: src/%.cpp
 	@echo "\033[38;5;45m$@\033[0m"
 	$(CPP) -o $@ $< $(LDFLAGS)

@@ -1,0 +1,18 @@
+{
+  "name": "C Development (Ubuntu 24.04)",
+  "build": {"dockerfile": "Dockerfile"},
+  "runArgs": ["--network=host"],
+  "remoteUser": "vscode",
+  "postCreateCommand": "gcc --version && make --version | head -n1",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-vscode.cpptools", "ms-vscode.cpptools-extension-pack", "ms-vscode.makefile-tools"],
+      "settings": {
+        "C_Cpp.default.compilerPath": "/usr/bin/gcc",
+        "C_Cpp.formatting": "clangFormat",
+        "editor.formatOnSave": true,
+        "files.eol": "\n"
+      }
+    }
+  }
+}
