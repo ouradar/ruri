@@ -1,6 +1,7 @@
 FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
 
 COPY sh-root-bashrc /root/.bashrc
+COPY sh-home-profile /home/vscode/.profile
 COPY run.sh /opt/run.sh
 
 RUN apt update && \
@@ -16,6 +17,7 @@ RUN apt update && \
     libfftw3-dev libnetcdf-dev libssl-dev libarchive-dev && \
     rm -rf /var/lib/apt/lists/* ; \
     # misc setup
+    chown -R vscode:vscode /home/vscode && \
     chmod +x /opt/run.sh && \
     mkdir /root/Developer
 

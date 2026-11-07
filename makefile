@@ -11,14 +11,28 @@ CFLAGS += -std=gnu2x
 
 CPP = g++
 CPPFLAGS = -O2
-CPPFLAGS += -std=gnu++14
+CPPFLAGS += -std=c++17 -Iinclude
 
 LDFLAGS = -L/lib/aarch64-linux-gnu -Wl,-whole-archive -luhd -Wl,-no-whole-archive -lboost_program_options -lpthread
 
 C_PROGS = rx_samples_c tx_samples_c playground_c
-CPP_PROGS = benchmark_rate
+CPP_PROGS = benchmark_rate trxd
+
+# SRC_DIR = src
+# BIN_DIR = bin
+# CPP_SRCS = $(wildcard $(SRC_DIR)/*.cpp)
+# CPP_OBJS = $(CPP_SRCS:.cpp=.o)
 
 all: showinfo $(C_PROGS) $(CPP_PROGS)
+
+# # Link object files to create the binary
+# $(CPP_TARGET): $(CPP_OBJS)
+# 	@mkdir -p $(BIN_DIR)
+# 	$(CXX) $(CPP_OBJS) -o $(CPP_TARGET)
+
+# # Compile source files to object files
+# %.o: %.cpp
+# 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
 	@echo "\033[38;5;203mCleaning...\033[0m"
@@ -34,6 +48,7 @@ showinfo:
 	BRANCH = \033[38;5;208m$(BRANCH)\033[0m\n\
 	CPUS = \033[38;5;203m$(CPUS)\033[0m\n\
 	CFLAGS = \033[38;5;141m$(CFLAGS)\033[0m\n\
+	CPPFLAGS = \033[38;5;141m$(CPPFLAGS)\033[0m\n\
 	C_PROGS = \033[38;5;45m$(C_PROGS)\033[0m\n\
 	CPP_PROGS = \033[38;5;45m$(CPP_PROGS)\033[0m\n\
 	"
