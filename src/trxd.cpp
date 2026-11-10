@@ -45,8 +45,98 @@ inline std::string time_delta_str(const start_time_type& ref_time)
 
 #define NOW() (time_delta_str(start_time))
 
-void rx_worker(uhd::usrp::multi_usrp::sptr usrp)
+void rx_worker(uhd::usrp::multi_usrp::sptr usrp,
+    const std::string args,
+    const start_time_type& start_time,
+    std::atomic<bool>& want_active)
 {
+    std::cout << boost::format("[%s] Creating the RX streamer...") % NOW() << std::endl;
+
+    // Set to maximum real-time priority
+    uhd::set_thread_priority_safe(1.0F, true);
+
+    // create a receive streamer
+    uhd::stream_args_t rx_stream_args("fc32", "sc16");
+    rx_stream_args.channels = {0, 1}; // may replace w/ 4-channel setup later
+    rx_stream_args.args = uhd::device_addr_t(args);
+    uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(rx_stream_args);
+
+    // print pre-test summary
+
+    auto time_stamp   = NOW();
+    auto rx_rate      = usrp->get_rx_rate() / 1e6;
+    auto num_channels = rx_stream->get_num_channels();
+    std::cout << boost::format("[%s] Testing receive rate %f Msps on %u channels\n") % time_stamp % rx_rate % num_channels;
+
+    // usrp->set_rx_spp(1024);
+    size_t spb = rx_stream->get_max_num_samps();
+    std::cout << boost::format("[%s] Using %u samples per buffer\n") % NOW() % spb << std::endl;
+
+    // Receive buffer
+    std::vector<char> buff(spb * uhd::convert::get_bytes_per_item("fc32"));
+    std::vector<void*> buffs;
+    for (size_t ch = 0; ch < rx_stream->get_num_channels(); ch++)
+        buffs.push_back(&buff.front()); // same buffer for each channel
+
+    // Create a 2D vector layout: One standalone vector array per channel
+    // std::vector<std::vector<std::complex<float>>> channel_buffs(
+    //     rx_stream->get_num_channels(),
+    //     std::vector<std::complex<float>>(spb)
+    // );
+    // std::vector<void*> buffs;
+    // for (size_t ch = 0; ch < rx_stream->get_num_channels(); ch++) {
+    //     buffs.push_back(&channel_buffs[ch].front());
+    // }
+
+    uhd::stream_cmd_t cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
+    cmd.num_samps = spb;
+    cmd.time_spec = usrp->get_time_now() + uhd::time_spec_t(0.1); // start in the future
+    cmd.stream_now = false;
+    rx_stream->issue_stream_cmd(cmd);
+
+    uhd::rx_metadata_t md;
+    std::atomic_ullong num_rx_samps{0};
+
+    double timeout = 0.1;
+
+    size_t count = 0;
+    size_t timeout_count = 0;
+    size_t overflow_count = 0;
+
+    while (want_active) {
+        try {
+            size_t rx_samps_per_channel = rx_stream->recv(buffs, cmd.num_samps, md, timeout);
+            num_rx_samps += rx_samps_per_channel;
+        } catch (const uhd::io_error& e) {
+            std::cerr << "[" << NOW() << "] Caught an IO exception. " << std::endl;
+            std::cerr << e.what() << std::endl;
+            return;
+        }
+
+        // handle error codes
+        switch (md.error_code) {
+            case uhd::rx_metadata_t::ERROR_CODE_NONE:
+                count++;
+                break;
+            case uhd::rx_metadata_t::ERROR_CODE_TIMEOUT:
+                timeout_count++;
+                break;
+            case uhd::rx_metadata_t::ERROR_CODE_OVERFLOW:
+                overflow_count++;
+                break;
+            default:
+                std::cerr << "[" << NOW() << "] Receiver error: " << md.strerror() << std::endl;
+                std::cerr << "[" << NOW() << "] Unexpected error on recv, continuing..." << std::endl;
+                break;
+        }
+    }
+    rx_stream->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+
+    std::cout << boost::format("[%s] Processed %u blocks") % NOW() % count << std::endl;
+    std::cout << boost::format("[%s] timeout_count = %u") % NOW() % timeout_count << std::endl;
+    std::cout << boost::format("[%s] overflow_count = %u") % NOW() % overflow_count << std::endl;
+    std::cout << boost::format("[%s] Received %llu samples") % NOW() % num_rx_samps.load() << std::endl;
+    std::cout << "rx_worker: want_active = false, exiting..." << std::endl;
     return;
 }
 
@@ -58,26 +148,22 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
     "  This program is transceiver relay to the USRP device. More to come ...\n";
 
     // hard-coded for now, will replace with RadarKit's preference derived configurations
-    std::string args = "type:n3xx,addr=192.168.21.109,master_clock_rate=125e6";
+    std::string args = "type:n3xx,addr=192.168.10.2,master_clock_rate=125e6";
 
     std::string rx_subdev, tx_subdev;
     std::string rx_otw = "sc16";
     std::string tx_otw = "sc16";
 
-    std::string priority;
-    bool elevate_priority = false;
     int verbose = 0;
 
     const int rx_decimation = 16;
-    const int tx_decimation = 4;
+    const int tx_decimation = 16;
 
     // setup the program options
     po::options_description desc("Allowed options");
     // clang-format off
     desc.add_options()
         ("help", "Show this help message and exit."),
-        ("priority", po::value<std::string>(&priority)->default_value("normal"), "Thread priority (normal, "
-            "high)."),
         ("verbose", po::value<int>(&verbose)->default_value(0), "Verbose output (0-2).")
     ;
     // clang-format on
@@ -90,11 +176,6 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         std::cout << help_text << std::endl;
         std::cout << desc << std::endl;
         return EXIT_SUCCESS;
-    }
-
-    if (priority == "high") {
-        uhd::set_thread_priority_safe();
-        elevate_priority = true;
     }
 
     std::cout << std::endl;
@@ -110,7 +191,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
 
     // int num_mboards = usrp->get_num_mboards();
 
-    std::atomic<bool> burst_timer_elapsed(false);
+    std::atomic<bool> want_active(true);
     std::vector<std::thread> threads;
 
     // hard-coded for now, will replace with RadarKit's preference derived configurations
@@ -120,20 +201,28 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
     usrp->set_rx_rate(rx_rate);
     usrp->set_tx_rate(tx_rate);
 
-    // create a receive streamer
-    uhd::stream_args_t rx_stream_args("", rx_otw);
-    rx_stream_args.channels = {0, 1}; // may replace w/ 4-channel setup later
-    rx_stream_args.args     = uhd::device_addr_t("");
-    uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(rx_stream_args);
-
     // duration in seconds
-    double duration = 3.0;
+    double duration = 3.14;
 
     // spawn a thread to handle the RX stream
-    threads.emplace_back([=, &burst_timer_elapsed]() {
-        rx_worker(usrp);
+    threads.emplace_back([=, &want_active]() {
+        rx_worker(usrp, args, start_time, want_active);
     });
+    uhd::set_thread_name(&threads.back(), "rx_worker");
 
+    const int64_t secs  = int64_t(duration);
+    const int64_t usecs = int64_t((duration - double(secs)) * 1e6);
+
+    std::chrono::microseconds sleep_duration = std::chrono::seconds(secs) + std::chrono::microseconds(usecs);
+    std::cout << "sleep_duration.count() = " << sleep_duration.count() << std::endl;
+
+    // sleep for duration seconds, then set the want_active flag to false
+    std::this_thread::sleep_for(sleep_duration);
+
+    want_active = false;
+    for (auto& t : threads) {
+        t.join();
+    }
 
     // finished
     std::cout << std::endl << "Done!" << std::endl << std::endl;

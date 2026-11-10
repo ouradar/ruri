@@ -21,4 +21,9 @@ RUN apt update && \
     chmod +x /opt/run.sh && \
     mkdir /root/Developer
 
+# RUN echo "net.core.rmem_default=33554432" >> /etc/sysctl.conf && \
+#     echo "net.core.rmem_max=33554432" >> /etc/sysctl.conf && \
+#     echo "net.core.wmem_default=33554432" >> /etc/sysctl.conf && \
+#     echo "net.core.wmem_max=33554432" >> /etc/sysctl.conf
+
 CMD ["/opt/run.sh"]

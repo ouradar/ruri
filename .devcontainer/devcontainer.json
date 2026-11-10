@@ -1,7 +1,13 @@
 {
   "name": "C Development (Ubuntu 24.04)",
-  "build": {"dockerfile": "Dockerfile"},
-  "runArgs": ["--network=host"],
+  "build": { "dockerfile": "Dockerfile" },
+  // "runArgs": ["--network=host"],
+  // Configure container capabilities for high-performance networking
+  "runArgs": ["--network=host", "--cap-add=NET_ADMIN"],
+  // Set environment variables inside the Devcontainer to assist UHD discovery
+  "containerEnv": {
+    "UHD_CUSTOM_ENV_ARGS": "addr=192.168.10.2"
+  },
   "remoteUser": "vscode",
   "postCreateCommand": "gcc --version && make --version | head -n1",
   "customizations": {

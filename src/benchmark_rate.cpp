@@ -96,6 +96,7 @@ void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp,
     if (spb == 0) {
         spb = rx_stream->get_max_num_samps();
     }
+    std::cout << boost::format("[%s] Using max samples per buffer: %u\n") % NOW() % spb << std::endl;
     std::vector<char> buff(spb * uhd::convert::get_bytes_per_item(rx_cpu));
     std::vector<void*> buffs;
     for (size_t ch = 0; ch < rx_stream->get_num_channels(); ch++)
