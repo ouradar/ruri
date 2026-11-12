@@ -8,9 +8,15 @@ For now, only example codes from the UHD software to accomplish compilation and 
 Try:
 
 ```
-benchmark_rate --args "type:n3xx,addr=192.168.10.2,master_clock_rate=125e6" --duration 5 --rx_rate 7.8125e6 --rx_otw sc16 --channels 0,1
+uhd_find_devices --args "${UHD_CUSTOM_ENV_ARGS}"
 
-benchmark_rate --args "type:n3xx,addr=192.168.21.109,master_clock_rate=125e6" --duration 5 --rx_rate 7.8125e6 --rx_otw sc16 --channels 0,1
 
-benchmark_rate --args "type:n3xx,addr=ni-n3xx-37FDEA5.local,master_clock_rate=125e6" --duration 5 --rx_rate 7.8125e6 --rx_otw sc16 --channels 0,1
-```
+benchmark_rate --args "${UHD_CUSTOM_ENV_ARGS}" --duration 5 --rx_rate 0.9765625e6 --rx_otw sc16 --channels 0,1
+
+benchmark_rate --args "${UHD_CUSTOM_ENV_ARGS}" --duration 5 --rx_rate 1.953125e6 --rx_otw sc16 --channels 0,1
+
+benchmark_rate --args "${UHD_CUSTOM_ENV_ARGS}" --duration 5 --rx_rate 3.90625e6 --rx_otw sc16 --channels 0,1
+
+benchmark_rate --args "${UHD_CUSTOM_ENV_ARGS}" --duration 5 --rx_rate 7.8125e6 --rx_otw sc16 --channels 0,1
+
+benchmark_rate --args "${UHD_CUSTOM_ENV_ARGS}" --duration 5 --rx_rate 15.625e6 --rx_otw sc16 --channels 0,1

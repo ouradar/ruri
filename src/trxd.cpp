@@ -68,25 +68,24 @@ void rx_worker(uhd::usrp::multi_usrp::sptr usrp,
     auto num_channels = rx_stream->get_num_channels();
     std::cout << boost::format("[%s] Testing receive rate %f Msps on %u channels\n") % time_stamp % rx_rate % num_channels;
 
-    // usrp->set_rx_spp(1024);
     size_t spb = rx_stream->get_max_num_samps();
     std::cout << boost::format("[%s] Using %u samples per buffer\n") % NOW() % spb << std::endl;
 
     // Receive buffer
-    std::vector<char> buff(spb * uhd::convert::get_bytes_per_item("fc32"));
-    std::vector<void*> buffs;
-    for (size_t ch = 0; ch < rx_stream->get_num_channels(); ch++)
-        buffs.push_back(&buff.front()); // same buffer for each channel
+    // std::vector<char> buff(spb * uhd::convert::get_bytes_per_item("fc32"));
+    // std::vector<void*> buffs;
+    // for (size_t ch = 0; ch < num_channels; ch++)
+    //     buffs.push_back(&buff.front()); // same buffer for each channel
 
     // Create a 2D vector layout: One standalone vector array per channel
-    // std::vector<std::vector<std::complex<float>>> channel_buffs(
-    //     rx_stream->get_num_channels(),
-    //     std::vector<std::complex<float>>(spb)
-    // );
-    // std::vector<void*> buffs;
-    // for (size_t ch = 0; ch < rx_stream->get_num_channels(); ch++) {
-    //     buffs.push_back(&channel_buffs[ch].front());
-    // }
+    std::vector<std::vector<std::complex<float>>> channel_buffs(
+        num_channels,
+        std::vector<std::complex<float>>(spb)
+    );
+    std::vector<void*> buffs;
+    for (size_t c = 0; c < num_channels; c++) {
+        buffs.push_back(&channel_buffs[c].front());
+    }
 
     uhd::stream_cmd_t cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
     cmd.num_samps = spb;
@@ -136,7 +135,6 @@ void rx_worker(uhd::usrp::multi_usrp::sptr usrp,
     std::cout << boost::format("[%s] timeout_count = %u") % NOW() % timeout_count << std::endl;
     std::cout << boost::format("[%s] overflow_count = %u") % NOW() % overflow_count << std::endl;
     std::cout << boost::format("[%s] Received %llu samples") % NOW() % num_rx_samps.load() << std::endl;
-    std::cout << "rx_worker: want_active = false, exiting..." << std::endl;
     return;
 }
 
@@ -149,6 +147,13 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
 
     // hard-coded for now, will replace with RadarKit's preference derived configurations
     std::string args = "type:n3xx,addr=192.168.10.2,master_clock_rate=125e6";
+
+    // get environmental variable for USRP device args
+    const char* env_args = std::getenv("UHD_CUSTOM_ENV_ARGS");
+    if (env_args) {
+        args = std::string(env_args);
+    }
+    std::cout << "Using USRP device args: " << args << std::endl;
 
     std::string rx_subdev, tx_subdev;
     std::string rx_otw = "sc16";
@@ -214,7 +219,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
     const int64_t usecs = int64_t((duration - double(secs)) * 1e6);
 
     std::chrono::microseconds sleep_duration = std::chrono::seconds(secs) + std::chrono::microseconds(usecs);
-    std::cout << "sleep_duration.count() = " << sleep_duration.count() << std::endl;
+    // std::cout << "sleep_duration.count() = " << sleep_duration.count() << std::endl;
 
     // sleep for duration seconds, then set the want_active flag to false
     std::this_thread::sleep_for(sleep_duration);
